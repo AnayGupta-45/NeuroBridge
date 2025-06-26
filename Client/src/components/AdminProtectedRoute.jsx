@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import api from '../axios';
 
-function ProtectedRoute({ children }) {
+function AdminProtectedRoute({ children }) {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/protected/profile')
+    api.get('/protected/admin-dashboard')
       .then(() => {
         setAuthorized(true);
         setLoading(false);
@@ -20,7 +20,7 @@ function ProtectedRoute({ children }) {
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
 
-  return authorized ? children : <Navigate to="/login" />;
+  return authorized ? children : <Navigate to="/admin-login" />;
 }
 
-export default ProtectedRoute;
+export default AdminProtectedRoute;
