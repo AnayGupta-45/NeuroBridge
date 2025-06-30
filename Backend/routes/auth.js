@@ -1,105 +1,94 @@
 const express = require('express');
-const passport = require('passport');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const passport = require('passport');
 const User = require('../models/User');
 
 const router = express.Router();
 
-// ============================
-// User Registration
-// ============================
+// Register (user or therapist)
 router.post('/register', async (req, res) => {
-    const { name, email, password, isAdmin } = req.body;
-    try {
-        let user = await User.findOne({ email });
-        if (user) return res.status(400).json({ message: 'Email already registered' });
+  const { name, email, password, role } = req.body;
 
-        const hashed = await bcrypt.hash(password, 10);
-        user = await User.create({ name, email, password: hashed, role: isAdmin ? 'admin' : 'user' });
+  try {
+    let user = await User.findOne({ email });
+    if (user) return res.status(400).json({ message: 'User already exists' });
 
-        if (isAdmin) return res.status(201).json({ message: 'Admin registered. Please login.' });
-        return res.status(201).json({ message: 'User registered. Please login.' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-// ============================
-// Admin Registration
-// ============================
-router.post('/register/admin', async (req, res) => {
-    const { name, email, password } = req.body;
-    try {
-        let user = await User.findOne({ email });
-        if (user) return res.status(400).json({ message: 'Email already registered' });
-
-        const hashed = await bcrypt.hash(password, 10);
-        user = await User.create({ name, email, password: hashed, role: 'admin' });
-
-        return res.status(201).json({ message: 'Admin registered. Please login.' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// ============================
-// Local User Login
-// ============================
-router.post('/login', (req, res, next) => {
-    passport.authenticate('local-user', (err, user, info) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (!user) return res.status(400).json({ message: 'Invalid user credentials' });
-        req.logIn(user, (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            return res.json({ message: 'User logged in successfully', user });
-        });
-    })(req, res, next);
-});
-
-// ============================
-// Local Admin Login
-// ============================
-router.post('/admin-login', (req, res, next) => {
-    passport.authenticate('local-admin', (err, user, info) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (!user) return res.status(400).json({ message: 'Invalid admin credentials' });
-        req.logIn(user, (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            return res.json({ message: 'Admin logged in successfully', user });
-        });
-    })(req, res, next);
-});
-
-// ============================
-// Logout
-// ============================
-router.get('/logout', (req, res) => {
-    req.logout((err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: 'Logged out successfully' });
+    user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role: role || 'user'
     });
+
+    await user.save();
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
-// ============================
-// Google OAuth for Users
-// ============================
-router.get('/google', passport.authenticate('google-user', { scope: ['profile', 'email'] }));
+// Login
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
 
-router.get(
-    '/google/callback/user',
-    passport.authenticate('google-user', { failureRedirect: 'http://localhost:5173/login' }),
-    (req, res) => res.redirect('http://localhost:5173/dashboard')
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+
+    if (!user.password) return res.status(400).json({ message: 'Google account login only' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get logged-in user details
+router.get('/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.id).select('-password');
+    res.json(user);
+  } catch (err) {
+    res.status(401).json({ message: 'Unauthorized' });
+  }
+});
+
+// Logout
+router.post('/logout', (req, res) => {
+  res.json({ message: 'Logged out successfully' });
+});
+
+router.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false })
 );
 
-// ============================
-// Google OAuth for Admins
-// ============================
-router.get('/google-admin', passport.authenticate('google-admin', { scope: ['profile', 'email'] }));
+router.get('/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login', session: false }),
+    (req, res) => {
+        const token = jwt.sign(
+            { id: req.user._id, role: req.user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
 
-router.get(
-    '/google/callback/admin',
-    passport.authenticate('google-admin', { failureRedirect: 'http://localhost:5173/admin-login' }),
-    (req, res) => res.redirect('http://localhost:5173/admin-dashboard')
+        res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    }
 );
 
 module.exports = router;
