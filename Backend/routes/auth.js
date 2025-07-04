@@ -6,7 +6,7 @@ const User = require("../models/User");
 
 const router = express.Router();
 
-// Manual Register
+// Manual Register with Unique Email Across Roles
 router.post("/register", async (req, res) => {
   const { name, email, password, role } = req.body;
 
@@ -15,12 +15,19 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    let user = await User.findOne({ email });
-    if (user) return res.status(409).json({ message: "User already exists" });
+    // ❌ Check if email already exists for ANY role
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res
+        .status(409)
+        .json({
+          message: `This email is already registered. Please use a different email.`,
+        });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    user = new User({ name, email, password: hashedPassword, role });
+    const user = new User({ name, email, password: hashedPassword, role });
     await user.save();
 
     res.status(201).json({ message: "User registered successfully" });
@@ -34,22 +41,16 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
-  }
-
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     if (!user.password)
-      return res
-        .status(400)
-        .json({ message: "Use Google login for this account" });
+      return res.status(400).json({ message: "Google account login only" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(401).json({ message: "Incorrect password" });
+      return res.status(400).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -62,28 +63,20 @@ router.post("/login", async (req, res) => {
       user: { id: user._id, name: user.name, role: user.role },
     });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // Get logged-in user details
 router.get("/me", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader)
-      return res.status(401).json({ message: "Authorization header missing" });
-
-    const token = authHeader.split(" ")[1];
+    const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-
     res.json(user);
   } catch (err) {
-    console.error(err.message);
-    res.status(401).json({ message: "Invalid or expired token" });
+    res.status(401).json({ message: "Unauthorized" });
   }
 });
 
@@ -92,14 +85,16 @@ router.post("/logout", (req, res) => {
   res.json({ message: "Logged out successfully" });
 });
 
-// Google OAuth Start
-router.get(
-  "/auth/google",
+// Google OAuth Start - Save role in session
+router.get("/auth/google", (req, res, next) => {
+  const role = req.query.role || "user";
+  if (!req.session) req.session = {}; // Create session if not exists
+  req.session.oauthRole = role;
   passport.authenticate("google", {
     scope: ["profile", "email"],
     session: false,
-  })
-);
+  })(req, res, next);
+});
 
 // Google OAuth Callback
 router.get(
@@ -108,20 +103,44 @@ router.get(
     failureRedirect: "/login",
     session: false,
   }),
-  (req, res) => {
-    if (!req.user) {
-      return res.redirect(
-        "http://localhost:5173/login?error=Google+authentication+failed"
+  async (req, res) => {
+    try {
+      const sessionRole = req.session ? req.session.oauthRole : "user";
+
+      // Check if email is already registered with another role
+      const existingUser = await User.findOne({ email: req.user.email });
+      if (existingUser && existingUser.role !== sessionRole) {
+        return res.redirect(
+          "http://localhost:5173/login?error=Email already registered with another role"
+        );
+      }
+
+      let user = await User.findOne({
+        email: req.user.email,
+        role: sessionRole,
+      });
+
+      if (!user) {
+        user = new User({
+          name: req.user.name,
+          email: req.user.email,
+          role: sessionRole,
+          password: null, // Google accounts have no password
+        });
+        await user.save();
+      }
+
+      const token = jwt.sign(
+        { id: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "1d" }
       );
+
+      res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    } catch (err) {
+      console.error(err.message);
+      res.redirect("http://localhost:5173/login?error=Server error");
     }
-
-    const token = jwt.sign(
-      { id: req.user._id, role: req.user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
   }
 );
 
