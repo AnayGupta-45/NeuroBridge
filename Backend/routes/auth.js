@@ -6,7 +6,6 @@ const User = require("../models/User");
 
 const router = express.Router();
 
-// Manual Register with Unique Email Across Roles
 router.post("/register", async (req, res) => {
   const { name, email, password, role } = req.body;
 
@@ -15,7 +14,6 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    // ❌ Check if email already exists for ANY role
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res
@@ -37,7 +35,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Manual Login
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -67,7 +64,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Get logged-in user details
+
 router.get("/me", async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
@@ -80,15 +77,15 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// Logout
+
 router.post("/logout", (req, res) => {
   res.json({ message: "Logged out successfully" });
 });
 
-// Google OAuth Start - Save role in session
+
 router.get("/auth/google", (req, res, next) => {
   const role = req.query.role || "user";
-  if (!req.session) req.session = {}; // Create session if not exists
+  if (!req.session) req.session = {};
   req.session.oauthRole = role;
   passport.authenticate("google", {
     scope: ["profile", "email"],
@@ -96,7 +93,6 @@ router.get("/auth/google", (req, res, next) => {
   })(req, res, next);
 });
 
-// Google OAuth Callback
 router.get(
   "/auth/google/callback",
   passport.authenticate("google", {
@@ -107,7 +103,6 @@ router.get(
     try {
       const sessionRole = req.session ? req.session.oauthRole : "user";
 
-      // Check if email is already registered with another role
       const existingUser = await User.findOne({ email: req.user.email });
       if (existingUser && existingUser.role !== sessionRole) {
         return res.redirect(
@@ -125,7 +120,7 @@ router.get(
           name: req.user.name,
           email: req.user.email,
           role: sessionRole,
-          password: null, // Google accounts have no password
+          password: null, 
         });
         await user.save();
       }

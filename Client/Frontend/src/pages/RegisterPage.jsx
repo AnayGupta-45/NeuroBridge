@@ -27,7 +27,6 @@ export default function RegisterPage() {
   };
 
   const handleGoogleRegister = () => {
-    // Pass the role in the query parameter
     window.location.href = `http://localhost:5000/api/auth/google?role=${formData.role}`;
   };
 

@@ -6,7 +6,6 @@ export default function TherapistDashboard() {
   const [therapist, setTherapist] = useState(null);
 
   useEffect(() => {
-    // Fetch therapist info from localStorage or API
     const therapistData = JSON.parse(localStorage.getItem("user"));
     if (!therapistData) {
       navigate("/login");

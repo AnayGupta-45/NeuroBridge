@@ -21,7 +21,7 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: "/api/auth/google/callback",
-      passReqToCallback: true, // ✅ This is required to pass req
+      passReqToCallback: true, 
     },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
@@ -31,14 +31,14 @@ passport.use(
           return done(null, user);
         }
 
-        // Get role from session (set before Google redirect)
-        const role = req.session.oauthRole || "user"; // Default to user if not set
+        
+        const role = req.session.oauthRole || "user"; 
 
         const newUser = new User({
           name: profile.displayName,
           email: profile.emails[0].value,
           googleId: profile.id,
-          password: "", // No password for Google users
+          password: "",
           role: role,
         });
 

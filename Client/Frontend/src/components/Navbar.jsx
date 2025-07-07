@@ -12,7 +12,7 @@ export default function Navbar() {
     if (userData) {
       setUser(JSON.parse(userData));
     }
-  }, [token]); // Runs again when token changes (login/logout)
+  }, [token]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");

@@ -3,7 +3,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const passport = require("passport");
-const session = require("express-session"); // ✅ Add this line
+const session = require("express-session");
+const moodRoutes = require('./routes/mood');
 
 require("./config/passport");
 
@@ -16,18 +17,18 @@ app.use(
   })
 );
 
-// ✅ Session Middleware (Required for Google OAuth role passing)
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "neurobridge_secret",
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false }, // Use 'secure: true' in production with HTTPS
+    cookie: { secure: false }, 
   })
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
+app.use('/api', moodRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)
