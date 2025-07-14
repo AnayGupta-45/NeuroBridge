@@ -32,9 +32,12 @@ export default function Navbar() {
       </span>
 
       <div className="space-x-4 flex items-center">
-        <Link to="/" className="hover:text-[#eebbc3] font-medium transition">
-          Home
-        </Link>
+        {/* Show Home button only if not on home/landing page */}
+        {location.pathname !== "/" && (
+          <Link to="/" className="hover:text-[#eebbc3] font-medium transition">
+            Home
+          </Link>
+        )}
 
         {user && (
           <span className="font-medium text-[#eebbc3]">
