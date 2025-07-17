@@ -1,7 +1,17 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import '../LandingPage.css';
 
 export default function LandingPage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check for token in localStorage to determine login status
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-cover bg-center text-white font-sans relative"
       style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80')` }}>
@@ -15,9 +25,18 @@ export default function LandingPage() {
           NeuroBridge is your intelligent gateway to smarter, emotionally aware digital collaboration.
           Connect, collaborate, and grow with advanced AI-powered tools.
         </p>
-        <Link to="/register" className="bg-[#eebbc3] text-[#232946] px-8 py-3 rounded-full font-bold shadow hover:bg-[#ffd6e0] transition">
-          Get Started
-        </Link>
+        {isLoggedIn ? (
+          <button
+            className="bg-[#eebbc3] text-[#232946] px-8 py-3 rounded-full font-bold shadow hover:bg-[#ffd6e0] transition"
+            onClick={() => navigate('/dashboard')}
+          >
+            Go to Dashboard
+          </button>
+        ) : (
+          <Link to="/register" className="bg-[#eebbc3] text-[#232946] px-8 py-3 rounded-full font-bold shadow hover:bg-[#ffd6e0] transition">
+            Get Started
+          </Link>
+        )}
       </main>
 
       {/* Features Section */}

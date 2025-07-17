@@ -81,7 +81,7 @@ export default function UserDashboard() {
           </button>
 
           <button onClick={() => navigate("/ai-chat")}
-            className="bg-[#232946] text-[#eebbc3] px-4 py-2 rounded-full font-bold shadow border border-[#eebbc3]/40 hover:bg-[#eebbc3] hover:text-[#232946] transition">
+            className="bg-[#eebbc3] text-[#232946] px-4 py-2 rounded-full font-bold shadow border border-[#eebbc3]/40 hover:bg-[#eebbc3] hover:text-[#232946] transition">
             AI Chat
           </button>
         </section>
